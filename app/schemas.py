@@ -30,3 +30,11 @@ class GenerateScriptResponse(BaseModel):
     style: str
     duration_seconds: int
     script: ScriptSections
+
+
+class VerifyLicenseRequest(BaseModel):
+    license_key: str = Field(..., min_length=1)
+
+
+class VerifyLicenseResponse(BaseModel):
+    valid: bool

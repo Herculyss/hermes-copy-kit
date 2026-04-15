@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html lang="pt-PT">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>CopySnap</title>
     <meta
       name="description"
-      content="Gera copy para anúncios e scripts de vídeo em segundos com AI."
+      content="Generate ad copy and video scripts in seconds with AI."
     />
     <link rel="stylesheet" href="./style.css" />
   </head>
@@ -14,108 +14,107 @@
     <header class="hero">
       <div class="container">
         <span class="badge">CopySnap</span>
-        <h1>Transforma uma ideia em copy e scripts de vídeo em segundos.</h1>
+        <h1>Turn one product idea into ad copy and video scripts in seconds.</h1>
         <p class="subtitle">
-          Gera 5 variações de copy prontas a usar e um script de 30 segundos com
-          Hook-Problem-Solution-CTA.
+          Generate 5 ready-to-use copy variations and a 30-second video script with a
+          Hook-Problem-Solution-CTA structure.
         </p>
         <div class="hero-actions">
-          <a class="button primary" href="#copy-form">Gerar copy</a>
-          <a class="button secondary" href="#buy">Comprar no Gumroad</a>
+          <a class="button primary" href="#copy-form">Generate copy</a>
+          <a class="button secondary" href="#buy">Get unlimited access</a>
         </div>
       </div>
     </header>
 
     <main class="container layout">
       <section class="card" id="copy-form">
-        <h2>Gerar 5 copies</h2>
+        <h2>Generate 5 copy variations</h2>
         <form id="copyGeneratorForm">
           <label>
-            Nome do produto
-            <input type="text" name="product_name" placeholder="FocusFlow" required />
+            Product name
+            <input type="text" name="product_name" placeholder="CopySnap" required />
           </label>
           <label>
-            Descrição
+            Description
             <textarea
               name="description"
               rows="4"
-              placeholder="Uma app que organiza tarefas e reduz distrações."
+              placeholder="An AI tool that generates ad copy and video scripts fast."
               required
             ></textarea>
           </label>
           <label>
-            Público-alvo
+            Audience
             <input
               type="text"
               name="audience"
-              placeholder="freelancers ocupados"
+              placeholder="founders and marketers"
               required
             />
           </label>
-          <button class="button primary full" type="submit">Gerar 5 copies</button>
+          <button class="button primary full" type="submit">Generate copy</button>
         </form>
         <div class="status" id="copyStatus"></div>
         <div class="results" id="copyResults"></div>
       </section>
 
       <section class="card" id="script-form">
-        <h2>Gerar script de vídeo</h2>
+        <h2>Generate a 30-second video script</h2>
         <form id="scriptGeneratorForm">
           <label>
-            Nome do produto
-            <input type="text" name="product_name" placeholder="FocusFlow" required />
+            Product name
+            <input type="text" name="product_name" placeholder="CopySnap" required />
           </label>
           <label>
-            Descrição
+            Description
             <textarea
               name="description"
               rows="4"
-              placeholder="Uma app que organiza tarefas e reduz distrações."
+              placeholder="An AI tool that generates ad copy and video scripts fast."
               required
             ></textarea>
           </label>
           <label>
-            Estilo
+            Style
             <input
               type="text"
               name="style"
-              placeholder="direto e energético"
+              placeholder="direct and energetic"
               required
             />
           </label>
-          <button class="button primary full" type="submit">Gerar script</button>
+          <button class="button primary full" type="submit">Generate script</button>
         </form>
         <div class="status" id="scriptStatus"></div>
         <div class="results" id="scriptResults"></div>
       </section>
 
       <section class="card highlight" id="buy">
-        <h2>Compra / apoia o projeto</h2>
+        <h2>Upgrade for unlimited access</h2>
         <p>
-          Testa o produto, valida o valor e depois usa o checkout no Gumroad para
-          apoiar ou comprar a versão completa.
+          Try one free generation per day, then unlock unlimited usage through Gumroad.
         </p>
         <ul class="feature-list">
-          <li>5 variações de copy por pedido</li>
-          <li>Script de vídeo de 30 segundos</li>
-          <li>Outputs prontos para anúncios, landing pages e criativos</li>
+          <li>5 ready-to-use copy variations per request</li>
+          <li>30-second video scripts with Hook, Problem, Solution, CTA</li>
+          <li>Built for ads, landing pages, social posts, Reels, and TikTok</li>
         </ul>
         <a
           class="button primary full"
-          href="https://gumroad.com/"
+          href="https://fuioherm.gumroad.com/l/copysnap"
           target="_blank"
           rel="noreferrer"
         >
-          Abrir Gumroad
+          Buy on Gumroad
         </a>
-        <small>Substitui este link pela URL final do produto no Gumroad.</small>
+        <small>Get unlimited access and skip the daily free limit.</small>
       </section>
     </main>
 
     <footer class="footer container">
       <p>
-        API configurável em <code>window.API_BASE_URL</code> ou diretamente no
-        ficheiro <code>script.js</code>.
+        API base URL can be configured with <code>window.API_BASE_URL</code> or in
+        <code>script.js</code>.
       </p>
     </footer>
 

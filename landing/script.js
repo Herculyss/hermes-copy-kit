@@ -1,4 +1,5 @@
 const API_BASE = window.API_BASE_URL || "http://127.0.0.1:8000";
+const GUMROAD_URL = "https://fuioherm.gumroad.com/l/copysnap";
 
 const copyForm = document.getElementById("copyGeneratorForm");
 const scriptForm = document.getElementById("scriptGeneratorForm");
@@ -41,6 +42,19 @@ function renderScriptResults(script) {
   });
 }
 
+function renderUpgradeOffer(container, message, upgradeUrl = GUMROAD_URL) {
+  clearResults(container);
+  const box = document.createElement("div");
+  box.className = "upgrade-card";
+  box.innerHTML = `
+    <p>${message}</p>
+    <a class="button primary full" href="${upgradeUrl}" target="_blank" rel="noreferrer">
+      Get unlimited access
+    </a>
+  `;
+  container.appendChild(box);
+}
+
 async function postJSON(endpoint, payload) {
   const response = await fetch(`${API_BASE}${endpoint}`, {
     method: "POST",
@@ -53,7 +67,10 @@ async function postJSON(endpoint, payload) {
   const data = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    throw new Error(data.detail || "Pedido falhou.");
+    const error = new Error(data.error || data.detail || "Request failed.");
+    error.status = response.status;
+    error.payload = data;
+    throw error;
   }
 
   return data;
@@ -62,7 +79,7 @@ async function postJSON(endpoint, payload) {
 copyForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   clearResults(copyResults);
-  setStatus(copyStatus, "A gerar 5 copies...");
+  setStatus(copyStatus, "Generating 5 copy variations...");
 
   const formData = new FormData(copyForm);
   const payload = {
@@ -74,16 +91,22 @@ copyForm.addEventListener("submit", async (event) => {
   try {
     const data = await postJSON("/generate-copy", payload);
     renderCopyResults(data.variations);
-    setStatus(copyStatus, "5 copies geradas com sucesso.");
+    setStatus(copyStatus, "Your copy variations are ready.");
   } catch (error) {
-    setStatus(copyStatus, error.message || "Erro ao gerar copy.", true);
+    if (error.status === 429) {
+      setStatus(copyStatus, error.message, true);
+      renderUpgradeOffer(copyResults, error.message, error.payload?.upgrade_url || GUMROAD_URL);
+      return;
+    }
+
+    setStatus(copyStatus, error.message || "Could not generate copy.", true);
   }
 });
 
 scriptForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   clearResults(scriptResults);
-  setStatus(scriptStatus, "A gerar script de vídeo...");
+  setStatus(scriptStatus, "Generating your video script...");
 
   const formData = new FormData(scriptForm);
   const payload = {
@@ -95,8 +118,14 @@ scriptForm.addEventListener("submit", async (event) => {
   try {
     const data = await postJSON("/generate-script", payload);
     renderScriptResults(data.script);
-    setStatus(scriptStatus, "Script gerado com sucesso.");
+    setStatus(scriptStatus, "Your script is ready.");
   } catch (error) {
-    setStatus(scriptStatus, error.message || "Erro ao gerar script.", true);
+    if (error.status === 429) {
+      setStatus(scriptStatus, error.message, true);
+      renderUpgradeOffer(scriptResults, error.message, error.payload?.upgrade_url || GUMROAD_URL);
+      return;
+    }
+
+    setStatus(scriptStatus, error.message || "Could not generate the script.", true);
   }
 });

@@ -170,12 +170,22 @@ textarea:focus {
 }
 
 .result-item,
-.script-block {
+.script-block,
+.upgrade-card {
   padding: 1rem;
   border-radius: 16px;
   background: rgba(31, 41, 55, 0.88);
   border: 1px solid rgba(148, 163, 184, 0.12);
   line-height: 1.6;
+}
+
+.upgrade-card {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.upgrade-card p {
+  margin: 0;
 }
 
 .script-block strong {

@@ -38,6 +38,7 @@ def test_generate_copy_uses_openrouter_and_returns_five_variations(monkeypatch) 
         "app.services._get_openrouter_free_models",
         lambda client: ["meta-llama/llama-3.3-70b-instruct:free"],
     )
+    monkeypatch.setattr("app.main._verify_license_key", lambda _: True)
 
     payload = {
         "product_name": "FocusFlow",
@@ -45,7 +46,11 @@ def test_generate_copy_uses_openrouter_and_returns_five_variations(monkeypatch) 
         "audience": "freelancers ocupados",
     }
 
-    response = client.post("/generate-copy", json=payload)
+    response = client.post(
+        "/generate-copy",
+        json=payload,
+        headers={"x-forwarded-for": "203.0.113.1", "x-license-key": "valid-license"},
+    )
 
     assert response.status_code == 200
     data = response.json()
@@ -82,6 +87,7 @@ def test_generate_script_uses_openrouter_and_returns_hpsc_sections(monkeypatch) 
         "app.services._get_openrouter_free_models",
         lambda client: ["meta-llama/llama-3.3-70b-instruct:free"],
     )
+    monkeypatch.setattr("app.main._verify_license_key", lambda _: True)
 
     payload = {
         "product_name": "FocusFlow",
@@ -89,7 +95,11 @@ def test_generate_script_uses_openrouter_and_returns_hpsc_sections(monkeypatch) 
         "style": "direto e energético",
     }
 
-    response = client.post("/generate-script", json=payload)
+    response = client.post(
+        "/generate-script",
+        json=payload,
+        headers={"x-forwarded-for": "203.0.113.2", "x-license-key": "valid-license"},
+    )
 
     assert response.status_code == 200
     data = response.json()
@@ -134,6 +144,7 @@ def test_openrouter_fallback_tries_next_free_model_after_429(monkeypatch) -> Non
         "app.services._get_openrouter_free_models",
         lambda client: ["model-a:free", "model-b:free"],
     )
+    monkeypatch.setattr("app.main._verify_license_key", lambda _: True)
 
     payload = {
         "product_name": "FocusFlow",
@@ -141,7 +152,11 @@ def test_openrouter_fallback_tries_next_free_model_after_429(monkeypatch) -> Non
         "audience": "freelancers ocupados",
     }
 
-    response = client.post("/generate-copy", json=payload)
+    response = client.post(
+        "/generate-copy",
+        json=payload,
+        headers={"x-forwarded-for": "203.0.113.3", "x-license-key": "valid-license"},
+    )
 
     assert response.status_code == 200
     assert seen_models == ["model-a:free", "model-b:free"]
@@ -218,6 +233,7 @@ def test_falls_back_to_google_ai_studio_after_openrouter_free_fails(monkeypatch)
         "app.services._get_openrouter_free_models",
         lambda client: ["model-a:free"],
     )
+    monkeypatch.setattr("app.main._verify_license_key", lambda _: True)
 
     payload = {
         "product_name": "FocusFlow",
@@ -225,7 +241,11 @@ def test_falls_back_to_google_ai_studio_after_openrouter_free_fails(monkeypatch)
         "audience": "freelancers ocupados",
     }
 
-    response = client.post("/generate-copy", json=payload)
+    response = client.post(
+        "/generate-copy",
+        json=payload,
+        headers={"x-forwarded-for": "203.0.113.4", "x-license-key": "valid-license"},
+    )
 
     assert response.status_code == 200
     assert seen_urls == [
@@ -260,6 +280,7 @@ def test_logs_obsidian_and_discord_alert_when_failure_rate_exceeds_half(monkeypa
     monkeypatch.setattr("app.services._append_capacity_alert_to_daily_log", fake_append)
     monkeypatch.setattr("app.services._send_discord_alert", fake_discord_alert)
     monkeypatch.setattr("app.services._request_stats", {"total": 0, "failed": 0, "alerted": False})
+    monkeypatch.setattr("app.main._verify_license_key", lambda _: True)
 
     payload = {
         "product_name": "FocusFlow",
@@ -267,8 +288,76 @@ def test_logs_obsidian_and_discord_alert_when_failure_rate_exceeds_half(monkeypa
         "audience": "freelancers ocupados",
     }
 
-    response = client.post("/generate-copy", json=payload)
+    response = client.post(
+        "/generate-copy",
+        json=payload,
+        headers={"x-forwarded-for": "203.0.113.5", "x-license-key": "valid-license"},
+    )
 
     assert response.status_code == 502
     assert notes == ["Free tiers sob pressão. Considerar adicionar créditos."]
     assert discord_alerts == ["Free tiers sob pressão. Considerar adicionar créditos."]
+
+
+def test_generate_copy_limits_free_usage_to_one_request_per_day_per_ip(monkeypatch, tmp_path) -> None:
+    usage_store = tmp_path / "usage_limits.json"
+    monkeypatch.setenv("USAGE_STORE_PATH", str(usage_store))
+    monkeypatch.setattr("app.main.generate_copy_variations", lambda **_: ["A", "B", "C", "D", "E"])
+    monkeypatch.setattr("app.main._utc_today", lambda: "2026-04-15")
+    monkeypatch.setattr("app.main._verify_license_key", lambda _: False)
+
+    payload = {
+        "product_name": "CopySnap",
+        "description": "Generate ads fast.",
+        "audience": "founders",
+    }
+    headers = {"x-forwarded-for": "203.0.113.10"}
+
+    first = client.post("/generate-copy", json=payload, headers=headers)
+    second = client.post("/generate-copy", json=payload, headers=headers)
+
+    assert first.status_code == 200
+    assert second.status_code == 429
+    assert second.json() == {
+        "error": "Free limit reached. Get unlimited access.",
+        "upgrade_url": "https://fuioherm.gumroad.com/l/copysnap",
+    }
+
+
+
+def test_generate_copy_resets_limit_on_next_utc_day(monkeypatch, tmp_path) -> None:
+    usage_store = tmp_path / "usage_limits.json"
+    monkeypatch.setenv("USAGE_STORE_PATH", str(usage_store))
+    monkeypatch.setattr("app.main.generate_copy_variations", lambda **_: ["A", "B", "C", "D", "E"])
+    current_day = {"value": "2026-04-15"}
+    monkeypatch.setattr("app.main._utc_today", lambda: current_day["value"])
+    monkeypatch.setattr("app.main._verify_license_key", lambda _: False)
+
+    payload = {
+        "product_name": "CopySnap",
+        "description": "Generate ads fast.",
+        "audience": "founders",
+    }
+    headers = {"x-forwarded-for": "203.0.113.11"}
+
+    first = client.post("/generate-copy", json=payload, headers=headers)
+    second = client.post("/generate-copy", json=payload, headers=headers)
+    current_day["value"] = "2026-04-16"
+    third = client.post("/generate-copy", json=payload, headers=headers)
+
+    assert first.status_code == 200
+    assert second.status_code == 429
+    assert third.status_code == 200
+
+
+
+def test_verify_license_placeholder_returns_invalid(monkeypatch) -> None:
+    monkeypatch.setattr("app.main._verify_license_key", lambda key: key == "valid-license")
+
+    invalid = client.post("/verify-license", json={"license_key": "bad-license"})
+    valid = client.post("/verify-license", json={"license_key": "valid-license"})
+
+    assert invalid.status_code == 200
+    assert invalid.json() == {"valid": False}
+    assert valid.status_code == 200
+    assert valid.json() == {"valid": True}
