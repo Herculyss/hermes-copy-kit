@@ -547,9 +547,7 @@ def test_valid_license_bypasses_daily_limit(monkeypatch, tmp_path) -> None:
 
 def test_gumroad_webhook_generates_license_and_retrieve_finds_it(monkeypatch, tmp_path) -> None:
     license_store = tmp_path / "licenses.json"
-    sent = []
     monkeypatch.setenv("LICENSE_STORE_PATH", str(license_store))
-    monkeypatch.setattr("app.main._send_license_email", lambda **kwargs: sent.append(kwargs))
 
     webhook = client.post(
         "/gumroad/webhook",
@@ -563,13 +561,6 @@ def test_gumroad_webhook_generates_license_and_retrieve_finds_it(monkeypatch, tm
     assert webhook.status_code == 200
     license_key = webhook.json()["license_key"]
     assert license_key.startswith("COPYSNAP-")
-    assert sent == [
-        {
-            "to_email": "buyer@example.com",
-            "license_key": license_key,
-            "order_id": "sale-123",
-        }
-    ]
 
     retrieve = client.post(
         "/retrieve-license",
@@ -577,21 +568,3 @@ def test_gumroad_webhook_generates_license_and_retrieve_finds_it(monkeypatch, tm
     )
     assert retrieve.status_code == 200
     assert retrieve.json()["license_key"] == license_key
-
-
-
-def test_send_license_email_raises_when_resend_not_configured(monkeypatch) -> None:
-    monkeypatch.delenv("RESEND_API_KEY", raising=False)
-    monkeypatch.delenv("RESEND_FROM_EMAIL", raising=False)
-
-    import app.main as main
-
-    try:
-        main._send_license_email(
-            to_email="buyer@example.com",
-            license_key="COPYSNAP-ABCD-EFGH-IJKL-MNOP",
-            order_id="sale-123",
-        )
-        assert False, "expected RuntimeError"
-    except RuntimeError as exc:
-        assert "RESEND_API_KEY" in str(exc)

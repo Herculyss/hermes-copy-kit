@@ -7,8 +7,6 @@ from pathlib import Path
 from typing import Any, Optional, Union
 from urllib.parse import parse_qs
 
-import httpx
-
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -28,7 +26,6 @@ from app.schemas import (
 from app.services import generate_copy_variations, generate_video_script
 
 UPGRADE_URL = "https://fuioherm.gumroad.com/l/copysnap"
-RESEND_API_URL = "https://api.resend.com/emails"
 DEFAULT_USAGE_STORE_PATH = Path("~/hermes-copy-kit/data/usage_limits.json").expanduser()
 DEFAULT_LICENSE_STORE_PATH = Path("~/hermes-copy-kit/data/licenses.json").expanduser()
 FREE_DAILY_LIMIT = 1
@@ -149,44 +146,6 @@ def _retrieve_license(email: str, order_id: Optional[str] = None) -> Optional[st
 
 
 
-def _send_license_email(to_email: str, license_key: str, order_id: str) -> None:
-    resend_api_key = os.getenv("RESEND_API_KEY")
-    resend_from_email = os.getenv("RESEND_FROM_EMAIL")
-
-    if not resend_api_key:
-        raise RuntimeError("RESEND_API_KEY is not set")
-    if not resend_from_email:
-        raise RuntimeError("RESEND_FROM_EMAIL is not set")
-
-    payload = {
-        "from": resend_from_email,
-        "to": [to_email],
-        "subject": "Your CopySnap license key",
-        "text": (
-            "Thank you for purchasing CopySnap!\n\n"
-            f"Your license key: {license_key}\n\n"
-            "How to start:\n"
-            "1. Go to https://benevolent-mermaid-18d8b0.netlify.app/\n"
-            "2. Enter your license key\n"
-            "3. Start generating unlimited ad copy and video scripts\n\n"
-            f"Order ID: {order_id}\n\n"
-            "Lost your key? Use the Recover license option on the app page with your purchase email."
-        ),
-    }
-
-    with httpx.Client(timeout=30.0) as client:
-        response = client.post(
-            RESEND_API_URL,
-            headers={
-                "Authorization": f"Bearer {resend_api_key}",
-                "Content-Type": "application/json",
-            },
-            json=payload,
-        )
-        response.raise_for_status()
-
-
-
 def _request_ip(request: Request) -> str:
     forwarded_for = request.headers.get("x-forwarded-for", "").strip()
     if forwarded_for:
@@ -293,10 +252,6 @@ async def gumroad_webhook(request: Request) -> GenerateLicenseResponse:
         raise HTTPException(status_code=400, detail="Missing Gumroad email or sale_id/order_id")
 
     license_key = _create_license(email=email, source="gumroad", order_id=order_id)
-    try:
-        _send_license_email(to_email=email, license_key=license_key, order_id=order_id)
-    except Exception:
-        pass
     return GenerateLicenseResponse(license_key=license_key)
 
 
