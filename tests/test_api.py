@@ -94,3 +94,45 @@ def test_generate_script_uses_openrouter_and_returns_hpsc_sections(monkeypatch) 
         "solution": "Solução com FocusFlow",
         "cta": "CTA com FocusFlow",
     }
+
+
+def test_openrouter_fallback_tries_next_model_after_429(monkeypatch) -> None:
+    seen_models = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        payload = json.loads(request.content.decode())
+        seen_models.append(payload["model"])
+        if payload["model"] == "meta-llama/llama-3.3-70b-instruct:free":
+            return httpx.Response(429, json={"error": {"message": "rate limited"}})
+        return httpx.Response(
+            200,
+            json={
+                "choices": [
+                    {
+                        "message": {
+                            "content": '["Fallback copy 1", "Fallback copy 2", "Fallback copy 3", "Fallback copy 4", "Fallback copy 5"]'
+                        }
+                    }
+                ]
+            },
+        )
+
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-openrouter-key")
+    monkeypatch.setattr(
+        "app.services._build_http_client",
+        lambda: httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+
+    payload = {
+        "product_name": "FocusFlow",
+        "description": "Uma app que organiza tarefas e reduz distrações.",
+        "audience": "freelancers ocupados",
+    }
+
+    response = client.post("/generate-copy", json=payload)
+
+    assert response.status_code == 200
+    assert seen_models == [
+        "meta-llama/llama-3.3-70b-instruct:free",
+        "nvidia/llama-3.1-nemotron-70b-instruct:free",
+    ]

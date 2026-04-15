@@ -7,7 +7,12 @@ import httpx
 from app.schemas import ScriptSections
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-OPENROUTER_MODEL = "meta-llama/llama-3.3-70b-instruct:free"
+OPENROUTER_MODELS = [
+    "meta-llama/llama-3.3-70b-instruct:free",
+    "nvidia/llama-3.1-nemotron-70b-instruct:free",
+    "google/gemma-3-27b-it:free",
+    "openrouter/free",
+]
 APP_NAME = "CopySnap"
 
 
@@ -37,18 +42,24 @@ def _call_openrouter(system_prompt, user_prompt):
         "HTTP-Referer": "http://localhost:8000",
         "X-Title": APP_NAME,
     }
-    payload = {
-        "model": OPENROUTER_MODEL,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
-        "temperature": 0.8,
-    }
+    last_error = None
     with _build_http_client() as client:
-        response = client.post(OPENROUTER_URL, headers=headers, json=payload)
-        response.raise_for_status()
-        return _extract_message_content(response.json())
+        for model in OPENROUTER_MODELS:
+            payload = {
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                "temperature": 0.8,
+            }
+            response = client.post(OPENROUTER_URL, headers=headers, json=payload)
+            if response.status_code == 429:
+                last_error = RuntimeError(f"Rate limited on model: {model}")
+                continue
+            response.raise_for_status()
+            return _extract_message_content(response.json())
+    raise RuntimeError("All OpenRouter fallback models returned 429") from last_error
 
 
 def generate_copy_variations(product_name, description, audience):
