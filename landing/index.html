@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hermes Copy Kit</title>
+    <meta
+      name="description"
+      content="Gera copy para anúncios e scripts de vídeo em segundos com AI."
+    />
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <header class="hero">
+      <div class="container">
+        <span class="badge">AI Copy Generator</span>
+        <h1>Transforma uma ideia em copy e scripts de vídeo em segundos.</h1>
+        <p class="subtitle">
+          Gera 5 variações de copy prontas a usar e um script de 30 segundos com
+          Hook-Problem-Solution-CTA.
+        </p>
+        <div class="hero-actions">
+          <a class="button primary" href="#copy-form">Gerar copy</a>
+          <a class="button secondary" href="#buy">Comprar no Gumroad</a>
+        </div>
+      </div>
+    </header>
+
+    <main class="container layout">
+      <section class="card" id="copy-form">
+        <h2>Gerar 5 copies</h2>
+        <form id="copyGeneratorForm">
+          <label>
+            Nome do produto
+            <input type="text" name="product_name" placeholder="FocusFlow" required />
+          </label>
+          <label>
+            Descrição
+            <textarea
+              name="description"
+              rows="4"
+              placeholder="Uma app que organiza tarefas e reduz distrações."
+              required
+            ></textarea>
+          </label>
+          <label>
+            Público-alvo
+            <input
+              type="text"
+              name="audience"
+              placeholder="freelancers ocupados"
+              required
+            />
+          </label>
+          <button class="button primary full" type="submit">Gerar 5 copies</button>
+        </form>
+        <div class="status" id="copyStatus"></div>
+        <div class="results" id="copyResults"></div>
+      </section>
+
+      <section class="card" id="script-form">
+        <h2>Gerar script de vídeo</h2>
+        <form id="scriptGeneratorForm">
+          <label>
+            Nome do produto
+            <input type="text" name="product_name" placeholder="FocusFlow" required />
+          </label>
+          <label>
+            Descrição
+            <textarea
+              name="description"
+              rows="4"
+              placeholder="Uma app que organiza tarefas e reduz distrações."
+              required
+            ></textarea>
+          </label>
+          <label>
+            Estilo
+            <input
+              type="text"
+              name="style"
+              placeholder="direto e energético"
+              required
+            />
+          </label>
+          <button class="button primary full" type="submit">Gerar script</button>
+        </form>
+        <div class="status" id="scriptStatus"></div>
+        <div class="results" id="scriptResults"></div>
+      </section>
+
+      <section class="card highlight" id="buy">
+        <h2>Compra / apoia o projeto</h2>
+        <p>
+          Testa o produto, valida o valor e depois usa o checkout no Gumroad para
+          apoiar ou comprar a versão completa.
+        </p>
+        <ul class="feature-list">
+          <li>5 variações de copy por pedido</li>
+          <li>Script de vídeo de 30 segundos</li>
+          <li>Outputs prontos para anúncios, landing pages e criativos</li>
+        </ul>
+        <a
+          class="button primary full"
+          href="https://gumroad.com/"
+          target="_blank"
+          rel="noreferrer"
+        >
+          Abrir Gumroad
+        </a>
+        <small>Substitui este link pela URL final do produto no Gumroad.</small>
+      </section>
+    </main>
+
+    <footer class="footer container">
+      <p>
+        API configurável em <code>window.API_BASE_URL</code> ou diretamente no
+        ficheiro <code>script.js</code>.
+      </p>
+    </footer>
+
+    <script src="./script.js"></script>
+  </body>
+</html>
