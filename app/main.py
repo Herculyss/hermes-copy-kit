@@ -1,5 +1,7 @@
+import hashlib
 import json
 import os
+import secrets
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional, Union
@@ -11,6 +13,8 @@ from fastapi.responses import JSONResponse
 from app.schemas import (
     GenerateCopyRequest,
     GenerateCopyResponse,
+    GenerateLicenseRequest,
+    GenerateLicenseResponse,
     GenerateScriptRequest,
     GenerateScriptResponse,
     VerifyLicenseRequest,
@@ -20,6 +24,7 @@ from app.services import generate_copy_variations, generate_video_script
 
 UPGRADE_URL = "https://fuioherm.gumroad.com/l/copysnap"
 DEFAULT_USAGE_STORE_PATH = Path("~/hermes-copy-kit/data/usage_limits.json").expanduser()
+DEFAULT_LICENSE_STORE_PATH = Path("~/hermes-copy-kit/data/licenses.json").expanduser()
 FREE_DAILY_LIMIT = 1
 
 app = FastAPI(title="CopySnap API")
@@ -37,27 +42,86 @@ def _usage_store_path() -> Path:
     return Path(os.getenv("USAGE_STORE_PATH", str(DEFAULT_USAGE_STORE_PATH))).expanduser()
 
 
+
+def _license_store_path() -> Path:
+    return Path(os.getenv("LICENSE_STORE_PATH", str(DEFAULT_LICENSE_STORE_PATH))).expanduser()
+
+
+
 def _utc_today() -> str:
     return datetime.now(timezone.utc).date().isoformat()
 
 
-def _load_usage_store() -> dict[str, dict[str, Any]]:
-    path = _usage_store_path()
+
+def _load_json_store(path: Path) -> dict[str, Any]:
     if not path.exists():
         return {}
     with open(path, "r", encoding="utf-8") as file:
         return json.load(file)
 
 
-def _save_usage_store(data: dict[str, dict[str, Any]]) -> None:
-    path = _usage_store_path()
+
+def _save_json_store(path: Path, data: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", encoding="utf-8") as file:
         json.dump(data, file)
 
 
+
+def _load_usage_store() -> dict[str, dict[str, Any]]:
+    return _load_json_store(_usage_store_path())
+
+
+
+def _save_usage_store(data: dict[str, dict[str, Any]]) -> None:
+    _save_json_store(_usage_store_path(), data)
+
+
+
+def _load_license_store() -> dict[str, dict[str, Any]]:
+    return _load_json_store(_license_store_path())
+
+
+
+def _save_license_store(data: dict[str, dict[str, Any]]) -> None:
+    _save_json_store(_license_store_path(), data)
+
+
+
+def _normalize_license_key(license_key: str) -> str:
+    return license_key.strip().upper()
+
+
+
+def _generate_license_value(email: str, source: str, order_id: str) -> str:
+    seed = f"{email.lower()}|{source.lower()}|{order_id}|{secrets.token_hex(8)}"
+    digest = hashlib.sha256(seed.encode("utf-8")).hexdigest().upper()
+    return "COPYSNAP-" + "-".join([digest[0:4], digest[4:8], digest[8:12], digest[12:16]])
+
+
+
+def _create_license(email: str, source: str, order_id: str) -> str:
+    licenses = _load_license_store()
+    for key, record in licenses.items():
+        if record.get("email") == email and record.get("order_id") == order_id:
+            return key
+
+    license_key = _normalize_license_key(_generate_license_value(email, source, order_id))
+    licenses[license_key] = {
+        "email": email,
+        "source": source,
+        "order_id": order_id,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    _save_license_store(licenses)
+    return license_key
+
+
+
 def _verify_license_key(license_key: str) -> bool:
-    return False
+    licenses = _load_license_store()
+    return _normalize_license_key(license_key) in licenses
+
 
 
 def _request_ip(request: Request) -> str:
@@ -69,9 +133,11 @@ def _request_ip(request: Request) -> str:
     return "unknown"
 
 
+
 def _extract_license_key(request: Request) -> Optional[str]:
     license_key = request.headers.get("x-license-key", "").strip()
     return license_key or None
+
 
 
 def _enforce_free_limit(request: Request) -> Optional[JSONResponse]:
@@ -106,6 +172,16 @@ def _enforce_free_limit(request: Request) -> Optional[JSONResponse]:
 @app.get("/")
 def read_root() -> dict[str, str]:
     return {"status": "ok", "service": "copysnap"}
+
+
+@app.post("/generate-license", response_model=GenerateLicenseResponse)
+def generate_license(payload: GenerateLicenseRequest) -> GenerateLicenseResponse:
+    license_key = _create_license(
+        email=payload.email.strip().lower(),
+        source=payload.source.strip(),
+        order_id=payload.order_id.strip(),
+    )
+    return GenerateLicenseResponse(license_key=license_key)
 
 
 @app.post("/generate-copy", response_model=GenerateCopyResponse)

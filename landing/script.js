@@ -1,5 +1,6 @@
 const API_BASE = window.API_BASE_URL || "http://127.0.0.1:8000";
 const GUMROAD_URL = "https://fuioherm.gumroad.com/l/copysnap";
+const LICENSE_STORAGE_KEY = "copysnap_license_key";
 
 const copyForm = document.getElementById("copyGeneratorForm");
 const scriptForm = document.getElementById("scriptGeneratorForm");
@@ -7,6 +8,14 @@ const copyStatus = document.getElementById("copyStatus");
 const scriptStatus = document.getElementById("scriptStatus");
 const copyResults = document.getElementById("copyResults");
 const scriptResults = document.getElementById("scriptResults");
+const licenseGate = document.getElementById("licenseGate");
+const appShell = document.getElementById("appShell");
+const licenseForm = document.getElementById("licenseForm");
+const licenseStatus = document.getElementById("licenseStatus");
+const licenseKeyInput = document.getElementById("licenseKeyInput");
+const freeTrialButton = document.getElementById("freeTrialButton");
+
+let activeLicenseKey = localStorage.getItem(LICENSE_STORAGE_KEY) || "";
 
 function setStatus(element, message, isError = false) {
   element.textContent = message;
@@ -15,6 +24,12 @@ function setStatus(element, message, isError = false) {
 
 function clearResults(element) {
   element.innerHTML = "";
+}
+
+function unlockApp(modeMessage) {
+  licenseGate.classList.add("hidden");
+  appShell.classList.remove("is-locked");
+  setStatus(licenseStatus, modeMessage || "Access unlocked.");
 }
 
 function renderCopyResults(variations) {
@@ -56,11 +71,17 @@ function renderUpgradeOffer(container, message, upgradeUrl = GUMROAD_URL) {
 }
 
 async function postJSON(endpoint, payload) {
+  const headers = {
+    "Content-Type": "application/json",
+  };
+
+  if (activeLicenseKey) {
+    headers["x-license-key"] = activeLicenseKey;
+  }
+
   const response = await fetch(`${API_BASE}${endpoint}`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers,
     body: JSON.stringify(payload),
   });
 
@@ -74,6 +95,60 @@ async function postJSON(endpoint, payload) {
   }
 
   return data;
+}
+
+async function verifyLicenseKey(licenseKey) {
+  const response = await fetch(`${API_BASE}/verify-license`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ license_key: licenseKey }),
+  });
+  const data = await response.json().catch(() => ({ valid: false }));
+  return Boolean(data.valid);
+}
+
+licenseForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const candidate = licenseKeyInput.value.trim();
+  if (!candidate) {
+    setStatus(licenseStatus, "Enter your license key first.", true);
+    return;
+  }
+
+  setStatus(licenseStatus, "Verifying your license key...");
+  const isValid = await verifyLicenseKey(candidate);
+  if (!isValid) {
+    setStatus(licenseStatus, "Invalid license key. Check your Gumroad email or buy access.", true);
+    return;
+  }
+
+  activeLicenseKey = candidate;
+  localStorage.setItem(LICENSE_STORAGE_KEY, candidate);
+  unlockApp("License key verified. Unlimited access unlocked.");
+});
+
+freeTrialButton.addEventListener("click", () => {
+  activeLicenseKey = "";
+  localStorage.removeItem(LICENSE_STORAGE_KEY);
+  unlockApp("Free daily trial enabled. You get one generation per day without a license key.");
+});
+
+async function bootstrapGate() {
+  if (!activeLicenseKey) {
+    return;
+  }
+
+  setStatus(licenseStatus, "Checking saved license key...");
+  const isValid = await verifyLicenseKey(activeLicenseKey);
+  if (!isValid) {
+    localStorage.removeItem(LICENSE_STORAGE_KEY);
+    activeLicenseKey = "";
+    setStatus(licenseStatus, "Saved license key expired or is invalid. Enter a new one.", true);
+    return;
+  }
+
+  licenseKeyInput.value = activeLicenseKey;
+  unlockApp("Saved license key verified. Unlimited access unlocked.");
 }
 
 copyForm.addEventListener("submit", async (event) => {
@@ -129,3 +204,5 @@ scriptForm.addEventListener("submit", async (event) => {
     setStatus(scriptStatus, error.message || "Could not generate the script.", true);
   }
 });
+
+bootstrapGate();

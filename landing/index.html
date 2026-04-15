@@ -11,6 +11,38 @@
     <link rel="stylesheet" href="./style.css" />
   </head>
   <body>
+    <div class="license-gate" id="licenseGate">
+      <div class="license-panel">
+        <span class="badge">CopySnap Access</span>
+        <h2>Enter your license key to unlock CopySnap</h2>
+        <p>
+          Paid customers receive a license key by email after checkout. If you have not
+          purchased yet, you can still try one free generation per day.
+        </p>
+        <form id="licenseForm" class="license-form">
+          <label>
+            License key
+            <input
+              type="text"
+              id="licenseKeyInput"
+              placeholder="COPYSNAP-XXXX-XXXX-XXXX-XXXX"
+              required
+            />
+          </label>
+          <button class="button primary full" type="submit">Unlock with license key</button>
+        </form>
+        <div class="status" id="licenseStatus"></div>
+        <div class="license-actions">
+          <button class="button secondary full" id="freeTrialButton" type="button">
+            Continue with free daily trial
+          </button>
+          <a class="button primary full" href="https://fuioherm.gumroad.com/l/copysnap" target="_blank" rel="noreferrer">
+            Buy CopySnap on Gumroad
+          </a>
+        </div>
+      </div>
+    </div>
+
     <header class="hero">
       <div class="container">
         <span class="badge">CopySnap</span>
@@ -26,7 +58,7 @@
       </div>
     </header>
 
-    <main class="container layout">
+    <main class="container layout app-shell is-locked" id="appShell">
       <section class="card" id="copy-form">
         <h2>Generate 5 copy variations</h2>
         <form id="copyGeneratorForm">
@@ -107,7 +139,7 @@
         >
           Buy on Gumroad
         </a>
-        <small>Get unlimited access and skip the daily free limit.</small>
+        <small>Paid customers receive a license key by email.</small>
       </section>
     </main>
 

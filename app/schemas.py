@@ -38,3 +38,13 @@ class VerifyLicenseRequest(BaseModel):
 
 class VerifyLicenseResponse(BaseModel):
     valid: bool
+
+
+class GenerateLicenseRequest(BaseModel):
+    email: str = Field(..., min_length=3)
+    source: str = Field(default="gumroad", min_length=1)
+    order_id: str = Field(..., min_length=1)
+
+
+class GenerateLicenseResponse(BaseModel):
+    license_key: str

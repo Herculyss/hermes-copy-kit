@@ -351,13 +351,49 @@ def test_generate_copy_resets_limit_on_next_utc_day(monkeypatch, tmp_path) -> No
 
 
 
-def test_verify_license_placeholder_returns_invalid(monkeypatch) -> None:
-    monkeypatch.setattr("app.main._verify_license_key", lambda key: key == "valid-license")
+def test_generate_license_creates_persisted_license_and_verify_accepts_it(monkeypatch, tmp_path) -> None:
+    usage_store = tmp_path / "usage_limits.json"
+    license_store = tmp_path / "licenses.json"
+    monkeypatch.setenv("USAGE_STORE_PATH", str(usage_store))
+    monkeypatch.setenv("LICENSE_STORE_PATH", str(license_store))
 
-    invalid = client.post("/verify-license", json={"license_key": "bad-license"})
-    valid = client.post("/verify-license", json={"license_key": "valid-license"})
+    generated = client.post(
+        "/generate-license",
+        json={"email": "buyer@example.com", "source": "gumroad", "order_id": "order-123"},
+    )
+    assert generated.status_code == 200
+    license_key = generated.json()["license_key"]
+    assert license_key
 
-    assert invalid.status_code == 200
-    assert invalid.json() == {"valid": False}
-    assert valid.status_code == 200
-    assert valid.json() == {"valid": True}
+    verified = client.post("/verify-license", json={"license_key": license_key})
+    assert verified.status_code == 200
+    assert verified.json() == {"valid": True}
+
+
+
+def test_valid_license_bypasses_daily_limit(monkeypatch, tmp_path) -> None:
+    usage_store = tmp_path / "usage_limits.json"
+    license_store = tmp_path / "licenses.json"
+    monkeypatch.setenv("USAGE_STORE_PATH", str(usage_store))
+    monkeypatch.setenv("LICENSE_STORE_PATH", str(license_store))
+    monkeypatch.setattr("app.main.generate_copy_variations", lambda **_: ["A", "B", "C", "D", "E"])
+    monkeypatch.setattr("app.main._utc_today", lambda: "2026-04-15")
+
+    generated = client.post(
+        "/generate-license",
+        json={"email": "buyer@example.com", "source": "gumroad", "order_id": "order-123"},
+    )
+    license_key = generated.json()["license_key"]
+
+    payload = {
+        "product_name": "CopySnap",
+        "description": "Generate ads fast.",
+        "audience": "founders",
+    }
+    headers = {"x-forwarded-for": "203.0.113.12", "x-license-key": license_key}
+
+    first = client.post("/generate-copy", json=payload, headers=headers)
+    second = client.post("/generate-copy", json=payload, headers=headers)
+
+    assert first.status_code == 200
+    assert second.status_code == 200
