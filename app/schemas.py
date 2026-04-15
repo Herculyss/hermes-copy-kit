@@ -1,4 +1,5 @@
 from pydantic import BaseModel, Field
+from typing import Optional
 
 
 class GenerateCopyRequest(BaseModel):
@@ -48,3 +49,13 @@ class GenerateLicenseRequest(BaseModel):
 
 class GenerateLicenseResponse(BaseModel):
     license_key: str
+
+
+class RetrieveLicenseRequest(BaseModel):
+    email: str = Field(..., min_length=3)
+    order_id: Optional[str] = None
+
+
+class RetrieveLicenseResponse(BaseModel):
+    found: bool
+    license_key: Optional[str] = None

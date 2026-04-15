@@ -397,3 +397,29 @@ def test_valid_license_bypasses_daily_limit(monkeypatch, tmp_path) -> None:
 
     assert first.status_code == 200
     assert second.status_code == 200
+
+
+
+def test_gumroad_webhook_generates_license_and_retrieve_finds_it(monkeypatch, tmp_path) -> None:
+    license_store = tmp_path / "licenses.json"
+    monkeypatch.setenv("LICENSE_STORE_PATH", str(license_store))
+
+    webhook = client.post(
+        "/gumroad/webhook",
+        data={
+            "email": "buyer@example.com",
+            "sale_id": "sale-123",
+            "product_id": "FC3DlP-6WFHyVoXMyVDzaw==",
+        },
+        headers={"content-type": "application/x-www-form-urlencoded"},
+    )
+    assert webhook.status_code == 200
+    license_key = webhook.json()["license_key"]
+    assert license_key.startswith("COPYSNAP-")
+
+    retrieve = client.post(
+        "/retrieve-license",
+        json={"email": "buyer@example.com", "order_id": "sale-123"},
+    )
+    assert retrieve.status_code == 200
+    assert retrieve.json()["license_key"] == license_key

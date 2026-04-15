@@ -31,6 +31,26 @@
           </label>
           <button class="button primary full" type="submit">Unlock with license key</button>
         </form>
+        <form id="retrieveLicenseForm" class="license-form secondary-form">
+          <label>
+            Purchase email
+            <input
+              type="email"
+              id="retrieveEmailInput"
+              placeholder="you@example.com"
+              required
+            />
+          </label>
+          <label>
+            Gumroad order ID (optional)
+            <input
+              type="text"
+              id="retrieveOrderInput"
+              placeholder="sale-123"
+            />
+          </label>
+          <button class="button secondary full" type="submit">Retrieve my license key</button>
+        </form>
         <div class="status" id="licenseStatus"></div>
         <div class="license-actions">
           <button class="button secondary full" id="freeTrialButton" type="button">

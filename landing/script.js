@@ -11,8 +11,11 @@ const scriptResults = document.getElementById("scriptResults");
 const licenseGate = document.getElementById("licenseGate");
 const appShell = document.getElementById("appShell");
 const licenseForm = document.getElementById("licenseForm");
+const retrieveLicenseForm = document.getElementById("retrieveLicenseForm");
 const licenseStatus = document.getElementById("licenseStatus");
 const licenseKeyInput = document.getElementById("licenseKeyInput");
+const retrieveEmailInput = document.getElementById("retrieveEmailInput");
+const retrieveOrderInput = document.getElementById("retrieveOrderInput");
 const freeTrialButton = document.getElementById("freeTrialButton");
 
 let activeLicenseKey = localStorage.getItem(LICENSE_STORAGE_KEY) || "";
@@ -107,6 +110,15 @@ async function verifyLicenseKey(licenseKey) {
   return Boolean(data.valid);
 }
 
+async function retrieveLicense(email, orderId) {
+  const response = await fetch(`${API_BASE}/retrieve-license`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, order_id: orderId || null }),
+  });
+  return response.json().catch(() => ({ found: false }));
+}
+
 licenseForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const candidate = licenseKeyInput.value.trim();
@@ -125,6 +137,29 @@ licenseForm.addEventListener("submit", async (event) => {
   activeLicenseKey = candidate;
   localStorage.setItem(LICENSE_STORAGE_KEY, candidate);
   unlockApp("License key verified. Unlimited access unlocked.");
+});
+
+retrieveLicenseForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const email = retrieveEmailInput.value.trim();
+  const orderId = retrieveOrderInput.value.trim();
+
+  if (!email) {
+    setStatus(licenseStatus, "Enter the purchase email used on Gumroad.", true);
+    return;
+  }
+
+  setStatus(licenseStatus, "Checking your purchase email...");
+  const result = await retrieveLicense(email, orderId);
+  if (!result.found || !result.license_key) {
+    setStatus(licenseStatus, "No license found yet. If you just purchased, wait a moment and try again.", true);
+    return;
+  }
+
+  licenseKeyInput.value = result.license_key;
+  activeLicenseKey = result.license_key;
+  localStorage.setItem(LICENSE_STORAGE_KEY, result.license_key);
+  unlockApp("License found and applied. Unlimited access unlocked.");
 });
 
 freeTrialButton.addEventListener("click", () => {

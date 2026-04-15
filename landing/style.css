@@ -61,6 +61,12 @@ body {
   gap: 0.85rem;
 }
 
+.secondary-form {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
 .license-actions {
   margin-top: 1rem;
 }
