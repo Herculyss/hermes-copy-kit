@@ -1,7 +1,7 @@
-# Gumroad Copy — Hermes Copy Kit
+# Gumroad Copy — CopySnap
 
 ## Product name
-Hermes Copy Kit
+CopySnap
 
 ## Short tagline
 Generate ad copy and 30-second video scripts in seconds with AI.
@@ -11,12 +11,12 @@ Pay what you want
 Recommended minimum: €9
 
 ## Short description
-Hermes Copy Kit helps you turn a product idea into ready-to-use marketing copy fast. Generate 5 copy variations for ads or landing pages, plus a 30-second video script using the Hook-Problem-Solution-CTA structure.
+CopySnap helps you turn a product idea into ready-to-use marketing copy fast. Generate 5 copy variations for ads or landing pages, plus a 30-second video script using the Hook-Problem-Solution-CTA structure.
 
 ## Full description
 Stop staring at a blank page every time you need to promote a product.
 
-Hermes Copy Kit gives you a simple AI-powered workflow to generate:
+CopySnap gives you a simple AI-powered workflow to generate:
 - 5 ready-to-use copy variations for ads, landing pages, or social posts
 - 1 short video ad script structured as Hook → Problem → Solution → CTA
 - Fast outputs you can adapt for paid ads, product pages, Reels, TikTok, or UGC briefs
@@ -32,7 +32,7 @@ This is ideal for:
 If you need to validate messaging, launch faster, or create more marketing assets with less effort, this is for you.
 
 ## What you get
-- Access to the Hermes Copy Kit web app / landing page
+- Access to the CopySnap web app / landing page
 - Copy generator endpoint
 - Video script generator endpoint
 - Simple workflow for turning product details into marketing assets
@@ -57,13 +57,13 @@ Output:
 ## Why this product
 Most people do not need more complexity. They need speed, clarity, and usable outputs.
 
-Hermes Copy Kit is designed to be simple:
+CopySnap is designed to be simple:
 - enter product info
 - click generate
 - get assets you can use immediately
 
 ## CTA section
-Get Hermes Copy Kit now and start generating better marketing copy in minutes.
+Get CopySnap now and start generating better marketing copy in minutes.
 
 ## Suggested FAQ
 
@@ -89,7 +89,7 @@ Yes. It is suitable for internal use, campaign ideation, and client content work
 - Start generating copy
 
 ## Suggested cover text
-Hermes Copy Kit
+CopySnap
 Generate ad copy + 30s video scripts with AI
 
 ## Delivery notes

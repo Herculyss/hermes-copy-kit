@@ -8,7 +8,7 @@ from app.schemas import ScriptSections
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 OPENROUTER_MODEL = "meta-llama/llama-3.3-70b-instruct:free"
-APP_NAME = "hermes-copy-kit"
+APP_NAME = "CopySnap"
 
 
 def _build_http_client():

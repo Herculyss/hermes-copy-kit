@@ -9,7 +9,7 @@ from app.schemas import (
 )
 from app.services import generate_copy_variations, generate_video_script
 
-app = FastAPI(title="Hermes Copy Kit API")
+app = FastAPI(title="CopySnap API")
 
 app.add_middleware(
     CORSMiddleware,
@@ -22,7 +22,7 @@ app.add_middleware(
 
 @app.get("/")
 def read_root() -> dict[str, str]:
-    return {"status": "ok", "service": "hermes-copy-kit"}
+    return {"status": "ok", "service": "copysnap"}
 
 
 @app.post("/generate-copy", response_model=GenerateCopyResponse)
