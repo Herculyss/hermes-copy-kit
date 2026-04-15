@@ -234,14 +234,18 @@ def test_falls_back_to_google_ai_studio_after_openrouter_free_fails(monkeypatch)
     ]
 
 
-def test_logs_obsidian_alert_when_failure_rate_exceeds_half(monkeypatch) -> None:
+def test_logs_obsidian_and_discord_alert_when_failure_rate_exceeds_half(monkeypatch) -> None:
     notes = []
+    discord_alerts = []
 
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(429, json={"error": {"message": "rate limited"}})
 
     def fake_append(message: str) -> None:
         notes.append(message)
+
+    def fake_discord_alert(message: str) -> None:
+        discord_alerts.append(message)
 
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-openrouter-key")
     monkeypatch.delenv("GOOGLE_AI_KEY", raising=False)
@@ -254,6 +258,7 @@ def test_logs_obsidian_alert_when_failure_rate_exceeds_half(monkeypatch) -> None
         lambda client: ["model-a:free"],
     )
     monkeypatch.setattr("app.services._append_capacity_alert_to_daily_log", fake_append)
+    monkeypatch.setattr("app.services._send_discord_alert", fake_discord_alert)
     monkeypatch.setattr("app.services._request_stats", {"total": 0, "failed": 0, "alerted": False})
 
     payload = {
@@ -266,3 +271,4 @@ def test_logs_obsidian_alert_when_failure_rate_exceeds_half(monkeypatch) -> None
 
     assert response.status_code == 502
     assert notes == ["Free tiers sob pressão. Considerar adicionar créditos."]
+    assert discord_alerts == ["Free tiers sob pressão. Considerar adicionar créditos."]

@@ -16,6 +16,8 @@ FREE_MODEL_CACHE_TTL_SECONDS = 3600
 APP_NAME = "CopySnap"
 CAPACITY_ALERT_MESSAGE = "Free tiers sob pressão. Considerar adicionar créditos."
 DAILY_LOG_DIR = os.path.expanduser("~/hermes-vault/00-DASHBOARD/Daily-Log")
+DISCORD_WEBHOOKS_FILE = os.path.expanduser("~/hermes-project/discord_webhooks.json")
+DISCORD_ALERTS_WEBHOOK_ENV = "DISCORD_ALERTS_WEBHOOK_URL"
 
 _free_models_cache: Optional[List[str]] = None
 _free_models_cache_expires_at = 0.0
@@ -143,6 +145,36 @@ def _append_capacity_alert_to_daily_log(message: str) -> None:
         daily_log.write(f"{prefix}{message}\n")
 
 
+def _get_alerts_webhook_url() -> Optional[str]:
+    env_webhook = os.getenv(DISCORD_ALERTS_WEBHOOK_ENV)
+    if env_webhook:
+        return env_webhook
+
+    if not os.path.exists(DISCORD_WEBHOOKS_FILE):
+        return None
+
+    with open(DISCORD_WEBHOOKS_FILE, "r", encoding="utf-8") as webhooks_file:
+        payload = json.load(webhooks_file)
+
+    return payload.get("webhooks", {}).get("alerts", {}).get("webhook_url")
+
+
+def _send_discord_alert(message: str) -> None:
+    webhook_url = _get_alerts_webhook_url()
+    if not webhook_url:
+        return
+
+    with _build_http_client() as client:
+        response = client.post(
+            webhook_url,
+            json={
+                "content": f"⚠️ {message}",
+                "username": "CopySnap Alerts",
+            },
+        )
+        response.raise_for_status()
+
+
 def _record_request_result(success: bool) -> None:
     _request_stats["total"] += 1
     if not success:
@@ -151,6 +183,10 @@ def _record_request_result(success: bool) -> None:
     failure_rate = _request_stats["failed"] / _request_stats["total"]
     if failure_rate > 0.5 and not _request_stats["alerted"]:
         _append_capacity_alert_to_daily_log(CAPACITY_ALERT_MESSAGE)
+        try:
+            _send_discord_alert(CAPACITY_ALERT_MESSAGE)
+        except Exception:
+            pass
         _request_stats["alerted"] = True
 
 
