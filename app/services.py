@@ -13,6 +13,7 @@ OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models"
 GOOGLE_AI_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
 GOOGLE_AI_MODEL = "gemini-2.0-flash"
 FREE_MODEL_CACHE_TTL_SECONDS = 3600
+PROVIDER_MAX_ATTEMPTS = 3
 APP_NAME = "CopySnap"
 CAPACITY_ALERT_MESSAGE = "Free tiers sob pressão. Considerar adicionar créditos."
 DAILY_LOG_DIR = os.path.expanduser("~/hermes-vault/00-DASHBOARD/Daily-Log")
@@ -42,11 +43,58 @@ def _extract_message_content(response_json: dict[str, Any]) -> str:
         raise RuntimeError("Invalid response payload from model provider") from exc
 
 
+
+def _extract_json_fragment(text: str) -> str:
+    text = text.strip()
+    if not text:
+        raise RuntimeError("Provider returned empty content")
+
+    for opener, closer in [("[", "]"), ("{", "}")]:
+        start = text.find(opener)
+        while start != -1:
+            depth = 0
+            in_string = False
+            escape = False
+            for index in range(start, len(text)):
+                char = text[index]
+                if in_string:
+                    if escape:
+                        escape = False
+                    elif char == "\\":
+                        escape = True
+                    elif char == '"':
+                        in_string = False
+                    continue
+
+                if char == '"':
+                    in_string = True
+                elif char == opener:
+                    depth += 1
+                elif char == closer:
+                    depth -= 1
+                    if depth == 0:
+                        return text[start : index + 1]
+            start = text.find(opener, start + 1)
+
+    raise RuntimeError("Provider content did not contain extractable JSON")
+
+
+
+def _parse_json_from_content(content: str) -> Any:
+    try:
+        return json.loads(content)
+    except json.JSONDecodeError:
+        fragment = _extract_json_fragment(content)
+        return json.loads(fragment)
+
+
+
 def _is_zero_price(value: Any) -> bool:
     try:
         return float(value) == 0.0
     except (TypeError, ValueError):
         return False
+
 
 
 def _get_openrouter_free_models(client: httpx.Client) -> list[str]:
@@ -85,6 +133,37 @@ def _get_openrouter_free_models(client: httpx.Client) -> list[str]:
     return models
 
 
+
+def _call_provider_with_retries(
+    client: httpx.Client,
+    url: str,
+    headers: dict[str, str],
+    payload_factory,
+    provider_label: str,
+) -> str:
+    last_error: Optional[Exception] = None
+
+    for attempt in range(1, PROVIDER_MAX_ATTEMPTS + 1):
+        response = client.post(url, headers=headers, json=payload_factory())
+        if response.status_code == 429:
+            last_error = RuntimeError(f"Rate limited on {provider_label} (attempt {attempt})")
+            continue
+
+        try:
+            response.raise_for_status()
+            content = _extract_message_content(response.json())
+            _parse_json_from_content(content)
+            return content
+        except Exception:
+            last_error = RuntimeError(f"Invalid response from {provider_label} (attempt {attempt})")
+            continue
+
+    if last_error:
+        raise last_error
+    raise RuntimeError(f"{provider_label} failed without a recoverable response")
+
+
+
 def _call_openrouter_free_models(client: httpx.Client, system_prompt: str, user_prompt: str) -> str:
     api_key = _get_required_env("OPENROUTER_API_KEY")
     headers = {
@@ -96,35 +175,41 @@ def _call_openrouter_free_models(client: httpx.Client, system_prompt: str, user_
 
     last_error: Optional[Exception] = None
     for model in _get_openrouter_free_models(client):
-        payload = {
-            "model": model,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            "temperature": 0.8,
-        }
-        response = client.post(OPENROUTER_URL, headers=headers, json=payload)
-        if response.status_code == 429:
-            last_error = RuntimeError(f"Rate limited on OpenRouter model: {model}")
+        try:
+            return _call_provider_with_retries(
+                client=client,
+                url=OPENROUTER_URL,
+                headers=headers,
+                payload_factory=lambda model=model: {
+                    "model": model,
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt},
+                    ],
+                    "temperature": 0.8,
+                },
+                provider_label=f"OpenRouter model {model}",
+            )
+        except Exception as exc:
+            last_error = exc
             continue
-        response.raise_for_status()
-        return _extract_message_content(response.json())
 
     if last_error:
         raise last_error
     raise RuntimeError("OpenRouter free models were unavailable")
 
 
+
 def _call_google_ai_studio(client: httpx.Client, system_prompt: str, user_prompt: str) -> str:
     api_key = _get_required_env("GOOGLE_AI_KEY")
-    response = client.post(
-        GOOGLE_AI_URL,
+    return _call_provider_with_retries(
+        client=client,
+        url=GOOGLE_AI_URL,
         headers={
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
         },
-        json={
+        payload_factory=lambda: {
             "model": GOOGLE_AI_MODEL,
             "messages": [
                 {"role": "system", "content": system_prompt},
@@ -132,9 +217,9 @@ def _call_google_ai_studio(client: httpx.Client, system_prompt: str, user_prompt
             ],
             "temperature": 0.8,
         },
+        provider_label="Google AI Studio Gemini Flash",
     )
-    response.raise_for_status()
-    return _extract_message_content(response.json())
+
 
 
 def _append_capacity_alert_to_daily_log(message: str) -> None:
@@ -143,6 +228,7 @@ def _append_capacity_alert_to_daily_log(message: str) -> None:
     prefix = "\n" if os.path.exists(daily_log_path) and os.path.getsize(daily_log_path) > 0 else ""
     with open(daily_log_path, "a", encoding="utf-8") as daily_log:
         daily_log.write(f"{prefix}{message}\n")
+
 
 
 def _get_alerts_webhook_url() -> Optional[str]:
@@ -157,6 +243,7 @@ def _get_alerts_webhook_url() -> Optional[str]:
         payload = json.load(webhooks_file)
 
     return payload.get("webhooks", {}).get("alerts", {}).get("webhook_url")
+
 
 
 def _send_discord_alert(message: str) -> None:
@@ -175,6 +262,7 @@ def _send_discord_alert(message: str) -> None:
         response.raise_for_status()
 
 
+
 def _record_request_result(success: bool) -> None:
     _request_stats["total"] += 1
     if not success:
@@ -190,6 +278,7 @@ def _record_request_result(success: bool) -> None:
         _request_stats["alerted"] = True
 
 
+
 def _call_openrouter(system_prompt: str, user_prompt: str) -> str:
     with _build_http_client() as client:
         try:
@@ -202,8 +291,9 @@ def _call_openrouter(system_prompt: str, user_prompt: str) -> str:
         except Exception as exc:
             _record_request_result(success=False)
             raise RuntimeError(
-                "OpenRouter free models are unavailable and Google AI Studio fallback also failed. Consider adding credits or retry later."
+                "All providers failed after 3 attempts each. Consider adding credits or retry later."
             ) from exc
+
 
 
 def generate_copy_variations(product_name: str, description: str, audience: str) -> list[str]:
@@ -222,12 +312,13 @@ def generate_copy_variations(product_name: str, description: str, audience: str)
     )
     content = _call_openrouter(system_prompt, user_prompt)
     try:
-        variations = json.loads(content)
-    except json.JSONDecodeError as exc:
+        variations = _parse_json_from_content(content)
+    except Exception as exc:
         raise RuntimeError("OpenRouter did not return valid JSON") from exc
     if not isinstance(variations, list) or len(variations) != 5:
         raise RuntimeError("Did not return exactly 5 variations")
     return [item.strip() for item in variations]
+
 
 
 def generate_video_script(product_name: str, description: str, style: str) -> ScriptSections:
@@ -245,7 +336,7 @@ def generate_video_script(product_name: str, description: str, style: str) -> Sc
     )
     content = _call_openrouter(system_prompt, user_prompt)
     try:
-        raw_script = json.loads(content)
-    except json.JSONDecodeError as exc:
+        raw_script = _parse_json_from_content(content)
+    except Exception as exc:
         raise RuntimeError("OpenRouter did not return valid JSON") from exc
     return ScriptSections(**raw_script)

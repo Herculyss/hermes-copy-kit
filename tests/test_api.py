@@ -159,7 +159,12 @@ def test_openrouter_fallback_tries_next_free_model_after_429(monkeypatch) -> Non
     )
 
     assert response.status_code == 200
-    assert seen_models == ["model-a:free", "model-b:free"]
+    assert seen_models == [
+        "model-a:free",
+        "model-a:free",
+        "model-a:free",
+        "model-b:free",
+    ]
 
 
 def test_free_model_discovery_filters_zero_pricing_and_uses_cache(monkeypatch) -> None:
@@ -250,8 +255,148 @@ def test_falls_back_to_google_ai_studio_after_openrouter_free_fails(monkeypatch)
     assert response.status_code == 200
     assert seen_urls == [
         "https://openrouter.ai/api/v1/chat/completions",
+        "https://openrouter.ai/api/v1/chat/completions",
+        "https://openrouter.ai/api/v1/chat/completions",
         "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
     ]
+
+
+
+def test_extracts_json_array_from_model_text_wrapper(monkeypatch) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if str(request.url) == "https://openrouter.ai/api/v1/models":
+            return httpx.Response(
+                200,
+                json={"data": [{"id": "model-a:free", "pricing": {"prompt": "0", "completion": "0"}}]},
+            )
+        return httpx.Response(
+            200,
+            json={
+                "choices": [
+                    {
+                        "message": {
+                            "content": 'Here you go:\n["Wrapped 1", "Wrapped 2", "Wrapped 3", "Wrapped 4", "Wrapped 5"]\nUse them well.'
+                        }
+                    }
+                ]
+            },
+        )
+
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-openrouter-key")
+    monkeypatch.setattr(
+        "app.services._build_http_client",
+        lambda: httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    monkeypatch.setattr("app.main._verify_license_key", lambda _: True)
+
+    payload = {
+        "product_name": "CopySnap",
+        "description": "Generate ads fast.",
+        "audience": "founders",
+    }
+
+    response = client.post(
+        "/generate-copy",
+        json=payload,
+        headers={"x-forwarded-for": "203.0.113.6", "x-license-key": "valid-license"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["variations"][0] == "Wrapped 1"
+
+
+
+def test_retries_invalid_json_three_times_then_uses_next_provider(monkeypatch) -> None:
+    attempts = {"openrouter": 0, "google": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if str(request.url) == "https://openrouter.ai/api/v1/models":
+            return httpx.Response(
+                200,
+                json={"data": [{"id": "model-a:free", "pricing": {"prompt": "0", "completion": "0"}}]},
+            )
+        if str(request.url) == "https://openrouter.ai/api/v1/chat/completions":
+            attempts["openrouter"] += 1
+            return httpx.Response(
+                200,
+                json={"choices": [{"message": {"content": "not json at all"}}]},
+            )
+        attempts["google"] += 1
+        return httpx.Response(
+            200,
+            json={
+                "choices": [
+                    {
+                        "message": {
+                            "content": '["Google 1", "Google 2", "Google 3", "Google 4", "Google 5"]'
+                        }
+                    }
+                ]
+            },
+        )
+
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-openrouter-key")
+    monkeypatch.setenv("GOOGLE_AI_KEY", "google-test-key")
+    monkeypatch.setattr(
+        "app.services._build_http_client",
+        lambda: httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    monkeypatch.setattr("app.main._verify_license_key", lambda _: True)
+
+    payload = {
+        "product_name": "CopySnap",
+        "description": "Generate ads fast.",
+        "audience": "founders",
+    }
+
+    response = client.post(
+        "/generate-copy",
+        json=payload,
+        headers={"x-forwarded-for": "203.0.113.7", "x-license-key": "valid-license"},
+    )
+
+    assert response.status_code == 200
+    assert attempts == {"openrouter": 3, "google": 1}
+
+
+
+def test_returns_502_only_after_all_providers_fail_three_times(monkeypatch) -> None:
+    attempts = {"openrouter": 0, "google": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if str(request.url) == "https://openrouter.ai/api/v1/models":
+            return httpx.Response(
+                200,
+                json={"data": [{"id": "model-a:free", "pricing": {"prompt": "0", "completion": "0"}}]},
+            )
+        if str(request.url) == "https://openrouter.ai/api/v1/chat/completions":
+            attempts["openrouter"] += 1
+            return httpx.Response(200, json={"choices": [{"message": {"content": "still bad"}}]})
+        attempts["google"] += 1
+        return httpx.Response(200, json={"choices": [{"message": {"content": "still bad"}}]})
+
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-openrouter-key")
+    monkeypatch.setenv("GOOGLE_AI_KEY", "google-test-key")
+    monkeypatch.setattr(
+        "app.services._build_http_client",
+        lambda: httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    monkeypatch.setattr("app.main._verify_license_key", lambda _: True)
+
+    payload = {
+        "product_name": "CopySnap",
+        "description": "Generate ads fast.",
+        "audience": "founders",
+    }
+
+    response = client.post(
+        "/generate-copy",
+        json=payload,
+        headers={"x-forwarded-for": "203.0.113.8", "x-license-key": "valid-license"},
+    )
+
+    assert response.status_code == 502
+    assert attempts == {"openrouter": 3, "google": 3}
 
 
 def test_logs_obsidian_and_discord_alert_when_failure_rate_exceeds_half(monkeypatch) -> None:
